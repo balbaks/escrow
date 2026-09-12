@@ -15,10 +15,14 @@ class VettingReport:
     action and which is proof of intent -- see install_phase.py /
     runtime_phase.py and the README for why that distinction matters.
 
-    `registry_error` is set (and `registry_exists` /
-    `registry_created` / `registry_download_estimate` are meaningless
-    placeholders) when the PyPI JSON API itself could not be reached --
-    see `registry.py`.
+    `registry_exists` is `bool | None`: `False` is a confident negative (a
+    real 404 from PyPI), `None` means the registry check itself could not
+    be completed (unreachable API, timeout, 5xx, unparseable response) --
+    those are not the same signal, and collapsing them would let a
+    transient network failure masquerade as a hallucinated package name.
+    `registry_error` is set (and `registry_created` /
+    `registry_download_estimate` are meaningless placeholders) exactly
+    when `registry_exists` is `None` -- see `registry.py`.
 
     `runtime_exit_code` and `runtime_events` are left at their defaults
     (`None` / `[]`) when Phase 2 never ran -- i.e. Phase 1 itself failed
@@ -27,7 +31,7 @@ class VettingReport:
 
     package: str
     version: str | None
-    registry_exists: bool
+    registry_exists: bool | None
     registry_created: str | None
     registry_download_estimate: int | None
     registry_error: str | None

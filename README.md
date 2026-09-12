@@ -107,6 +107,19 @@ pypistats.org) with its own availability and rate-limit failure modes,
 this tool doesn't fabricate one. Wiring up a real download-volume source
 is future work.
 
+`registry_exists` is `bool | None`, and the `None` case is deliberate: a
+real 404 from PyPI (`exists=False`, `error=None`) is a confident
+negative, but an unreachable API, a timeout, a 5xx, or an unparseable
+response (`exists=None`, `error` set) means the check itself could not be
+completed. These are not the same signal, and this tool never collapses
+them into one -- a transient network failure while checking the registry
+must never be reported as though it were a confident "this package does
+not exist", which is exactly the ambiguity a hallucinated-package check
+exists to resolve, not introduce. See
+[`tests/test_registry_checks.py`](tests/test_registry_checks.py) for the
+proof: the real-404 case and the mocked-failure cases are asserted as
+distinct states.
+
 ## Scope (v0.1.0)
 
 - PyPI / `pip` only. No npm, no other ecosystem.
@@ -168,6 +181,45 @@ $ escrow vet requests --version 2.31.0
     events below are what was attempted; network access was off.
   no events observed
 ```
+
+That's the "everything's fine" case. The actual motivating scenario --
+an LLM hallucinates a package name that doesn't exist -- looks like this.
+Real, unedited output from a real run against a genuinely nonexistent
+name:
+
+```console
+$ escrow vet this-package-definitely-does-not-exist-escrow-test-xyz-987654321
+=== registry: this-package-definitely-does-not-exist-escrow-test-xyz-987654321 ===
+  exists: False
+  created: None
+  download_estimate: None
+
+=== phase 1: install (network allowed) -- exit_code=1 ===
+    events below are what actually happened; network access was open.
+  [process_spawn] subprocess.Popen: ['lsb_release', '-a'] (allowed)
+  [process_spawn] subprocess.Popen: ['uname', '-rs'] (allowed)
+  [network] resolve 'pypi.org':443 (allowed)
+  [network] connect to ('151.101.64.223', 443) (allowed)
+  [network] resolve 'pypi.org':443 (allowed)
+  [network] connect to ('151.101.64.223', 443) (allowed)
+
+=== phase 2: import (network off) -- exit_code=None ===
+    events below are what was attempted; network access was off.
+  no events observed
+$ echo $?
+1
+```
+
+`registry_exists=False` is a confident negative here -- this is a real
+404, not an unreachable-API ambiguity (see "What the registry check does
+and doesn't tell you" above). `pip` still reaches out to PyPI during
+Phase 1 (that's `pip` itself checking, not something escrow gates on the
+registry result) and gets nothing back to install, so Phase 1 fails
+(`exit_code=1`) and Phase 2 never runs at all (`exit_code=None`, no
+events) -- there's nothing installed to import. The exit code propagates:
+`echo $?` above is `1`, not `0`. This is the exact case that would have
+silently executed a slopsquatted payload without a tool sitting in front
+of the install.
 
 Exit code mirrors Phase 1's: `0` on a clean install, otherwise the
 install's own exit code (Phase 2 never runs if Phase 1 failed -- there's

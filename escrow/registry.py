@@ -28,14 +28,21 @@ DEFAULT_TIMEOUT_S = 10
 class RegistryInfo:
     """Result of one registry check.
 
-    When `error` is set, the API could not be reached or returned
-    something unparseable -- `exists`/`created`/`download_estimate` are
-    meaningless placeholders in that case, not a real signal. Callers must
-    check `error` first, precisely so an unreachable API is never silently
-    reported as "package does not exist".
+    `exists` is `bool | None`, and the `None` case is deliberate, not a
+    placeholder: `exists=False` means a real, confident negative -- PyPI's
+    JSON API returned an actual 404 for this name. `exists=None` (always
+    paired with `error` set) means the check could not be completed at
+    all -- the API was unreachable, timed out, returned a 5xx, or sent
+    back something unparseable. These are not the same signal. A
+    hallucinated package name and a flaky network both used to collapse
+    to `exists=False`, which is exactly the ambiguity this tool exists to
+    avoid -- a transient failure must never be reported as though it were
+    a confident "this package does not exist". Callers must check `error`
+    first; when it's set, `created`/`download_estimate` are meaningless
+    placeholders too.
     """
 
-    exists: bool
+    exists: bool | None
     created: str | None
     download_estimate: int | None
     error: str | None
@@ -43,7 +50,9 @@ class RegistryInfo:
 
 def check_registry(package: str, timeout: int = DEFAULT_TIMEOUT_S) -> RegistryInfo:
     """Look up `package` on PyPI's JSON API. Never raises: unreachability
-    or a malformed response is reported via `RegistryInfo.error` instead."""
+    or a malformed response is reported via `RegistryInfo.error` (with
+    `exists=None`) instead -- see `RegistryInfo` for why that's distinct
+    from a real 404 (`exists=False`, `error=None`)."""
     url = PYPI_JSON_URL.format(package=package)
     try:
         with urllib.request.urlopen(url, timeout=timeout) as resp:
@@ -52,12 +61,12 @@ def check_registry(package: str, timeout: int = DEFAULT_TIMEOUT_S) -> RegistryIn
         if exc.code == 404:
             return RegistryInfo(exists=False, created=None, download_estimate=None, error=None)
         return RegistryInfo(
-            exists=False, created=None, download_estimate=None,
+            exists=None, created=None, download_estimate=None,
             error=f"PyPI returned HTTP {exc.code}",
         )
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
         return RegistryInfo(
-            exists=False, created=None, download_estimate=None,
+            exists=None, created=None, download_estimate=None,
             error=f"PyPI JSON API unreachable: {exc}",
         )
 
@@ -65,7 +74,7 @@ def check_registry(package: str, timeout: int = DEFAULT_TIMEOUT_S) -> RegistryIn
         data = json.loads(raw)
     except json.JSONDecodeError as exc:
         return RegistryInfo(
-            exists=False, created=None, download_estimate=None,
+            exists=None, created=None, download_estimate=None,
             error=f"PyPI returned unparseable JSON: {exc}",
         )
 
