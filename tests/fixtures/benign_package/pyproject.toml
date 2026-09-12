@@ -1,0 +1,8 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "benign-package"
+version = "0.1.0"
+description = "A benign escrow test fixture that does nothing observable on install or import."
