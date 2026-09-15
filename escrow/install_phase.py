@@ -139,11 +139,17 @@ def run_install(
     *,
     local_source: Path | None = None,
     timeout: int = DEFAULT_TIMEOUT_S,
+    docker_network: str | None = None,
+    docker_dns: str | None = None,
 ) -> InstallPhaseResult:
     """Install `package` (or, for tests, the local fixture directory at
     `local_source`) inside Phase 1's sandbox, and report exit code, every
     observed behavior event, the tar.gz'd installed files, and the
     inferred import name -- all needed to hand off to `runtime_phase.run_import`.
+
+    `docker_network`/`docker_dns` default to `None` and leave normal
+    behavior (real internet, Docker's default bridge) untouched -- see
+    `_container.run_driver` for what they're for.
     """
     marker = watcher.generate_marker()
     local_source_b64 = _tar_directory_b64(local_source) if local_source is not None else None
@@ -153,6 +159,7 @@ def run_install(
 
     raw = _container.run_driver(
         script, image=DEFAULT_IMAGE, dockerfile=DOCKERFILE, timeout=timeout, network=True,
+        docker_network=docker_network, docker_dns=docker_dns,
         name_prefix="escrow-install",
     )
 

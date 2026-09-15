@@ -25,6 +25,8 @@ def vet(
     local_source: Path | None = None,
     install_timeout: int = install_phase.DEFAULT_TIMEOUT_S,
     runtime_timeout: int = runtime_phase.DEFAULT_TIMEOUT_S,
+    docker_network: str | None = None,
+    docker_dns: str | None = None,
 ) -> VettingReport:
     """Vet `package` (optionally pinned to `version`) before it's ever
     installed for real: check its PyPI registry footprint, then actually
@@ -35,6 +37,12 @@ def vet(
     from directly, bypassing the real PyPI entirely (see
     `install_phase.run_install`). Real callers never need it.
 
+    `docker_network`/`docker_dns` default to `None` (normal behavior:
+    Phase 1 reaches the real internet). They exist for controlled
+    evaluation against real malicious packages, where Phase 1's network
+    must be redirected to an isolated sinkhole instead -- see
+    MALWARE_EVALUATION.md and `_container.run_driver`. Not for routine use.
+
     Never raises on account of what the vetted package itself did. Can
     raise if Docker itself is unavailable or a sandbox image fails to
     build (`escrow._container.DockerUnavailableError`, `ImageBuildError`).
@@ -43,6 +51,7 @@ def vet(
 
     install_result = install_phase.run_install(
         package, version, local_source=local_source, timeout=install_timeout,
+        docker_network=docker_network, docker_dns=docker_dns,
     )
 
     runtime_events: list[dict] = []

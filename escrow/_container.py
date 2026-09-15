@@ -99,6 +99,8 @@ def run_driver(
     dockerfile: Path,
     timeout: int,
     network: bool,
+    docker_network: str | None = None,
+    docker_dns: str | None = None,
     name_prefix: str = "escrow",
     memory: str = DEFAULT_MEMORY,
     cpus: str = DEFAULT_CPUS,
@@ -109,6 +111,19 @@ def run_driver(
     from `dockerfile`. `network=True` omits `--network none` (Phase 1);
     `network=False` passes it (Phase 2). Always removes the container
     afterward, whether the run succeeded, failed, or timed out.
+
+    `docker_network`/`docker_dns` are unused by normal `vet()` calls (both
+    default to `None`, leaving every existing code path -- the real
+    internet for Phase 1, `--network none` for Phase 2 -- completely
+    unchanged). They exist so a caller can point Phase 1 at a pre-built,
+    isolated Docker network (e.g. a `--internal` network with no route to
+    the real internet, fronted by a sinkhole) instead of the default
+    bridge -- needed once, for MALWARE_EVALUATION.md, to run real
+    historical malicious packages without ever letting Phase 1's
+    intentionally-open network reach the live internet. Passing
+    `docker_network` implies attaching to that named network instead of
+    Docker's default bridge; it does not affect whether `--network none`
+    is passed for Phase 2.
     """
     repo_root = dockerfile.resolve().parent
     require_docker()
@@ -119,6 +134,10 @@ def run_driver(
     cmd = ["docker", "run", "--rm", "--name", container_name, "-i"]
     if not network:
         cmd += ["--network", "none"]
+    elif docker_network is not None:
+        cmd += ["--network", docker_network]
+    if docker_dns is not None:
+        cmd += ["--dns", docker_dns]
     cmd += [
         "--read-only",
         "--tmpfs",

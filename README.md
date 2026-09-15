@@ -257,3 +257,16 @@ specific event that fixture is designed to produce -- not just that
 | [`malicious_import_hook`](tests/fixtures/malicious_import_hook/) | 2 | A network connection attempted on import is observed and shown blocked -- contrast with the same event type in Phase 1, where it would show unblocked -- in [`test_runtime_phase_detection.py`](tests/test_runtime_phase_detection.py) |
 
 [`tests/`](tests/) is the proof for every claim in this README.
+
+## Against real malware
+
+The tests above prove escrow's detection logic against fixtures written
+to exercise it. [`MALWARE_EVALUATION.md`](MALWARE_EVALUATION.md) runs the
+same unmodified detection mechanism against 11 real, documented,
+historical malicious PyPI packages, sourced from a public research
+dataset and detonated inside a network-sinkholed variant of Phase 1 built
+specifically for that evaluation -- never the live internet. It found a
+real, previously-undocumented gap in Phase 2's own artifact-loading
+mechanism (a `.pth`-file payload class it currently can't see at all),
+alongside several clean hits. Read it before trusting a clean report on
+a package you don't already know.

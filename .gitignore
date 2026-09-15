@@ -5,3 +5,10 @@ __pycache__/
 .pytest_cache/
 build/
 dist/
+
+# Real historical malware source (MALWARE_EVALUATION.md's corpus) -- never
+# committed in plaintext, matching the DataDog dataset's own posture
+# (password-protected zips, "do not run it on your machine"). Reproduce
+# from the cited dataset/versions in MALWARE_EVALUATION.md, not from here.
+malware_eval/samples/
+malware_eval/samples_phase2/
