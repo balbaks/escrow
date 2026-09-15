@@ -47,7 +47,7 @@ def ensure_image_built(force: bool = False) -> None:
 
 
 def _build_driver_script(marker: str, import_name: str, artifact_b64: str) -> str:
-    return f'''import base64, io, os, sys, tarfile
+    return f'''import base64, io, os, site, sys, tarfile
 
 _MARKER = {marker!r}
 _EVENTS_PATH = os.environ.get("ESCROW_EVENTS_PATH", "/tmp/escrow_events.jsonl")
@@ -57,7 +57,17 @@ os.makedirs(_TARGET_DIR, exist_ok=True)
 with tarfile.open(fileobj=io.BytesIO(base64.b64decode({artifact_b64!r})), mode="r:gz") as _tf:
     _tf.extractall(_TARGET_DIR, filter="data")
 
-sys.path.insert(0, _TARGET_DIR)
+# site.addsitedir(), not a plain sys.path.insert(): pip installed this
+# artifact with --target, the same shape as a real site-packages
+# directory, and a package can ship a top-level *.pth file whose
+# `import ...` lines Python's own site module executes automatically at
+# real interpreter startup (the mechanism the real litellm compromise
+# used). sys.path.insert() alone makes the package importable but never
+# triggers that .pth processing -- only site.addsitedir() (or a directory
+# site itself scans at startup) does. addsitedir() also adds _TARGET_DIR
+# to sys.path itself, so this replaces the old sys.path.insert() call
+# rather than needing both.
+site.addsitedir(_TARGET_DIR)
 
 _import_ok = True
 try:

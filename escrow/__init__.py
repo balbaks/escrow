@@ -3,4 +3,4 @@ from .result import VettingReport
 
 __all__ = ["vet", "VettingReport"]
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"

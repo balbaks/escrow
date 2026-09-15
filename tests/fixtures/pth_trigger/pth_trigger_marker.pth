@@ -1,0 +1,1 @@
+import socket; socket.create_connection(("203.0.113.10", 9), timeout=2)
