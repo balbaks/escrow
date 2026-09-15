@@ -255,7 +255,6 @@ specific event that fixture is designed to produce -- not just that
 | [`benign_package`](tests/fixtures/benign_package/) | 1 & 2 | A normal package produces a clean report in both phases -- this isn't "flag everything" |
 | [`malicious_install_hook`](tests/fixtures/malicious_install_hook/) | 1 | A `setup.py` file write outside `/tmp` is observed and shown blocked, in [`test_install_phase_detection.py`](tests/test_install_phase_detection.py) |
 | [`malicious_import_hook`](tests/fixtures/malicious_import_hook/) | 2 | A network connection attempted on import is observed and shown blocked -- contrast with the same event type in Phase 1, where it would show unblocked -- in [`test_runtime_phase_detection.py`](tests/test_runtime_phase_detection.py) |
-| [`pth_trigger`](tests/fixtures/pth_trigger/) | 2 | A top-level `.pth` file's `import`-prefixed line is observed via `site.addsitedir()` -- models the real `litellm` compromise's mechanism (see `MALWARE_EVALUATION.md`), in [`test_runtime_phase_detection.py`](tests/test_runtime_phase_detection.py) |
 
 [`tests/`](tests/) is the proof for every claim in this README.
 
@@ -263,28 +262,11 @@ specific event that fixture is designed to produce -- not just that
 
 The tests above prove escrow's detection logic against fixtures written
 to exercise it. [`MALWARE_EVALUATION.md`](MALWARE_EVALUATION.md) runs the
-same detection mechanism against 11 real, documented, historical
-malicious PyPI packages, sourced from a public research dataset and
-detonated inside a network-sinkholed variant of Phase 1 built
+same unmodified detection mechanism against 11 real, documented,
+historical malicious PyPI packages, sourced from a public research
+dataset and detonated inside a network-sinkholed variant of Phase 1 built
 specifically for that evaluation -- never the live internet. It found a
-real, previously-undocumented architectural gap in Phase 2's own
-artifact-loading mechanism: a `.pth`-file payload class Phase 2 could not
-see at all, because loading the installed artifact via a plain
-`sys.path.insert()` makes the package importable without ever triggering
-the `.pth`-file processing real Python site-initialization performs at
-interpreter startup.
-
-**Fixed as of v0.1.1.** Phase 2 now loads the artifact via
-`site.addsitedir()` instead -- the same primitive real Python uses at
-startup -- so a `.pth` file shipped at the top level of the artifact
-(exactly where the real `litellm` compromise shipped `litellm_init.pth`)
-is now processed the same way a live install would process it. See
-[`tests/test_runtime_phase_detection.py::test_pth_triggered_action_is_observed_in_phase_2`](tests/test_runtime_phase_detection.py)
-for the regression test (a local, benign fixture modeling the mechanism,
-never the real `litellm` sample) and `escrow/runtime_phase.py` for the
-fix itself. One narrower limitation survives, inherited from CPython's
-own `site` module rather than introduced by this fix: a `.pth` file's
-remaining lines stop being processed after the first line that raises --
-see `MALWARE_EVALUATION.md`'s v0.1.1 addendum for the honest detail.
-Read the full evaluation before trusting a clean report on a package you
-don't already know.
+real, previously-undocumented gap in Phase 2's own artifact-loading
+mechanism (a `.pth`-file payload class it currently can't see at all),
+alongside several clean hits. Read it before trusting a clean report on
+a package you don't already know.

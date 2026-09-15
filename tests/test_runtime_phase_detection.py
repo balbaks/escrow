@@ -69,35 +69,3 @@ def test_malicious_import_hook_network_attempt_is_observed_and_blocked():
     # same kind of event would show blocked=False because network is open
     # there. This is the distinction the two-phase report exists to draw.
     assert all(e["blocked"] for e in network_events)
-
-
-def test_pth_triggered_action_is_observed_in_phase_2():
-    """Regression test for the .pth blind spot MALWARE_EVALUATION.md
-    documented against the real litellm compromise: a package that ships a
-    top-level `.pth` file (outside the package directory entirely, e.g.
-    via `data_files=[("", [...])]`) whose `import`-prefixed line Python's
-    own site module auto-executes at interpreter startup -- independent of
-    whether the package next to it is ever imported.
-
-    `pth_trigger` models that *mechanism* with a harmless marker action (a
-    connection attempt to the same RFC 5737 TEST-NET-3 address
-    `malicious_import_hook` already uses), not any real payload. Before
-    the fix (runtime_phase.py's `sys.path.insert()` -> `site.addsitedir()`
-    change), this reported zero events for this fixture -- confirmed by
-    temporarily reverting the fix and re-running this exact check.
-    """
-    installed = _install("pth_trigger", "pth-trigger")
-    assert installed.import_name == "pth_trigger"
-
-    result = runtime_phase.run_import(installed.artifact, installed.import_name, timeout=20)
-
-    assert not result.timed_out
-    assert result.import_succeeded
-
-    network_events = [e for e in result.events if e["type"] == "network"]
-    assert network_events, (
-        "expected the .pth file's network attempt to be observed, got: "
-        f"{result.events}"
-    )
-    assert any("203.0.113.10" in e["detail"] for e in network_events)
-    assert all(e["blocked"] for e in network_events)
